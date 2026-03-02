@@ -6,7 +6,7 @@ A Claude Code plugin marketplace for AI-native knowledge sharing and encrypted c
 
 ```bash
 # 1. Add this marketplace
-/plugin marketplace add github.com/bmeindl/claude-plugins
+/plugin marketplace add bmeindl/claude-plugins
 
 # 2. Install the collab plugin
 /plugin install collab@bmeindl-plugins
@@ -14,6 +14,11 @@ A Claude Code plugin marketplace for AI-native knowledge sharing and encrypted c
 # 3. Run the interactive setup (~5 minutes)
 /collab setup
 ```
+
+> **Note:** If step 1 fails with "SSH authentication failed", run this first to use HTTPS:
+> ```bash
+> git config --global url."https://github.com/".insteadOf "git@github.com:"
+> ```
 
 That's it. Setup handles everything: cloning the shared repo, generating SSH keys, installing dependencies, creating your profile, connecting with collaborators.
 

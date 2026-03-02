@@ -252,6 +252,18 @@ After install, check auth:
 gh auth status 2>/dev/null || gh auth login
 ```
 
+**Fix SSH→HTTPS for GitHub (common issue):**
+Claude Code's plugin system and `git clone` may try SSH by default, which fails without SSH keys configured for GitHub. If `gh` is authenticated via HTTPS (the default), configure git to match:
+```bash
+# Check if SSH works
+ssh -T git@github.com 2>&1 | grep -q "successfully" || {
+  # SSH doesn't work — set git to use HTTPS for GitHub
+  gh auth setup-git
+  git config --global url."https://github.com/".insteadOf "git@github.com:"
+}
+```
+This ensures all GitHub git operations (clone, push, pull) use HTTPS with the `gh` token.
+
 If `brew` is not available, show manual install instructions.
 
 #### 3. Install Dependencies
