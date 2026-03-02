@@ -1,7 +1,7 @@
 ---
 name: collab
-description: Shared context collaboration — share knowledge, send messages, sync with collaborators. Use when user says "share this", "send to [person]", "check inbox", "sync collab", "what has [person] shared", "collab setup", or any intent to share context, communicate with collaborators, or manage the shared space.
-argument-hint: "setup | share <topic> | sync | inbox | send <person> <msg> | ask <question> | read <person> | decide <topic> | status | brief <person> | contacts"
+description: Shared context collaboration — share knowledge, send messages, sync with collaborators. Use when user says "share this", "send to [person]", "check inbox", "sync collab", "what has [person] shared", "collab setup", "add [person]", or any intent to share context, communicate with collaborators, or manage the shared space.
+argument-hint: "setup | share <topic> | sync | inbox | send <person> <msg> | ask <question> | read <person> | decide <topic> | status | brief <person> | contacts | add-collaborator <name>"
 allowed-tools: Read, Write, Edit, Glob, Grep, Bash
 ---
 
@@ -80,7 +80,9 @@ The manifest lives at the workspace root (tracked in git) and records what's sha
 version: 1
 workspace: ground-control
 user: benjamin
-ai_collab_path: ../ai-collab
+repos:
+  ai-collab: ../ai-collab       # GitHub — private collab, tool dev
+  iu-shared: ../iu-shared       # GitLab — IU team sharing (optional)
 
 shares:
   - source: path/to/local/file.md       # relative to workspace root
@@ -175,6 +177,7 @@ If not found → setup flow offers to clone it.
    - "status"             → Status mode
    - "brief <person>"     → Brief mode
    - "contacts"           → Contacts mode
+   - "add-collaborator"   → Add Collaborator mode
    - Natural language      → Infer intent
 ```
 
@@ -221,6 +224,22 @@ Where is it hosted?
 ```
 
 Then: `git clone <url> ../ai-collab`
+
+#### 2.5. Install CLI Tools
+
+```bash
+# GitHub CLI (for repo invites, key upload)
+which gh 2>/dev/null || brew install gh
+# GitLab CLI (if IU GitLab repo is configured)
+which glab 2>/dev/null || brew install glab
+```
+
+After install, check auth:
+```bash
+gh auth status 2>/dev/null || gh auth login
+```
+
+If `brew` is not available, show manual install instructions.
 
 #### 3. Install Dependencies
 
@@ -393,6 +412,83 @@ Try these:
 
 ---
 
+## Mode: Add Collaborator
+
+**Trigger:** `add-collaborator <name>`, "add [person] to collab", "invite [person]"
+
+### Flow
+
+1. **Ask name** (if not provided as argument)
+
+2. **Ask platform username:**
+   - "What's their GitHub username?" (for ai-collab repo)
+   - "What's their GitLab username?" (for iu-shared repo, if configured)
+   - Need at least one.
+
+3. **Check CLI tools:**
+   ```bash
+   which gh 2>/dev/null   # for GitHub repos
+   which glab 2>/dev/null  # for GitLab repos
+   ```
+   If missing → offer `brew install gh` / `brew install glab`.
+
+4. **Invite to repo(s):**
+   ```bash
+   # GitHub
+   gh api repos/OWNER/REPO/collaborators/USERNAME -X PUT -f permission=push
+   # GitLab (if applicable)
+   # Agent looks up project ID and user ID, then invites
+   ```
+
+5. **Create folder scaffold** in the appropriate repo:
+   ```bash
+   mkdir -p REPO/<name>/outbound/iu-public
+   mkdir -p REPO/<name>/outbound/all
+   mkdir -p REPO/<name>/inbox/from-general
+   # Cross-create inbox folders for existing collaborators
+   for existing in $(ls REPO/*/profile.md | xargs dirname | xargs basename); do
+     mkdir -p REPO/$existing/inbox/from-<name>
+   done
+   ```
+
+6. **Fetch SSH keys** for encryption:
+   ```bash
+   python3 $AI_COLLAB/tools/collab-sync/sync.py --workspace $WORKSPACE \
+     connect <name> --github <username>
+   ```
+   If user said "private collaborator" → this step is mandatory.
+   Otherwise → optional (iu-public works without encryption).
+
+7. **Create profile** from convention:
+   ```markdown
+   # <Name>
+   **Role:** (to be filled by <name>)
+   **Workspace:** (to be set up)
+   **AI Tools:** (to be filled)
+   **GitHub:** <github-username>
+   **GitLab:** <gitlab-username or "(TBD)">
+   ```
+
+8. **Update collaborators table** in repo CLAUDE.md
+
+9. **Commit + push:**
+   ```bash
+   git add <name>/ CLAUDE.md
+   git commit -m "setup: <name> joined collaboration"
+   git push
+   ```
+
+10. **Report:**
+    ```
+    "Added <name> as collaborator.
+    They should:
+    1. Install the collab plugin
+    2. Run /collab setup in their workspace
+    3. They'll automatically see all iu-public shared context."
+    ```
+
+---
+
 ## Mode: Share
 
 **Trigger:** `share <topic>`, or "share this with [person/group]"
@@ -434,6 +530,14 @@ Try these:
    5. The tool auto-appends `.age` to the dest path
 
    The user never types `--encrypt-for`. They say "share this with Quintus" → you detect person-specific → check for keys → encrypt automatically.
+
+   **Repo routing (when multiple repos configured):**
+   - `iu-public` → `iu-shared` (GitLab) if available, else `ai-collab`
+   - Person-specific → check person's profile for platform. IU colleagues → `iu-shared`, others → `ai-collab`
+   - `all` → `ai-collab`
+   - Single repo configured → everything goes there (backward compat)
+
+   Pass `--repo <name>` to `collab-sync add` to target the right repo.
 
 3. **Generate tag** (auto-generated from content if not provided)
    - Read the content, produce a ~150 char description
