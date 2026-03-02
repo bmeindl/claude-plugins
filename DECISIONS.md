@@ -53,6 +53,26 @@ Tracks architectural decisions, alternatives considered, and reasoning. Product 
 
 **Why:** Collaboration is personal — it's about YOUR context sharing. It shouldn't be tied to a specific project. Install once, use everywhere.
 
+## 2026-03-02: Multi-Repo Topology — Per Group, Not Per Person
+
+**Decision:** Scale via separate repos per collaboration group (IU team, founders, friends), not one mega-repo for everyone.
+
+**[Benjamin] framing:** "Like Mastodon servers — you choose which one you go on."
+
+**Alternatives considered:**
+| Option | Pros | Cons | Verdict |
+|--------|------|------|---------|
+| Single repo (current) | Simple, already built | Metadata leaks across groups, single blast radius | **Phase 1 only** |
+| Multi-repo per group | True isolation, different hosts per group, limited blast radius | More repos to manage, multi-repo push/pull | **Phase 2 — recommended** |
+| Mastodon-like federation | Discovery, cross-instance messaging, instance policies | Complex, premature for MVP | **Phase 4 vision** |
+| Separate repos per person | Maximum isolation | Repo explosion (N²), hard to manage shared context | Rejected |
+
+**Rationale:** Groups map to trust boundaries. IU team = one trust level, friends = another. Repos should follow trust boundaries, not individual relationships. collab-sync already has `repo:` per manifest target — multi-repo is a natural extension.
+
+**Encryption longevity note:** [Benjamin] raised concern about long-term viability of encryption (quantum computing, store-now-decrypt-later). Multi-repo + private repos = primary mitigation. Content expires before encryption does for collaboration notes. Post-quantum age variants tracked upstream.
+
+**Full analysis:** `ground-control/personal/projects/ai-workspace-product/concepts/2026-03-02_multi-repo-topology.md`
+
 ## 2026-03-01: Visibility Model
 
 **Decision:** Three-tier visibility with auto-encryption:
