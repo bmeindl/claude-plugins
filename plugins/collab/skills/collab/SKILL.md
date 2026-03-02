@@ -386,18 +386,23 @@ python3 $AI_COLLAB/tools/collab-sync/sync.py init \
 
 Create inbound symlinks from **all repos** so the user sees everything in one place:
 
+**IMPORTANT:** Replace `<name>` below with the actual username from Step 4 (e.g., "quintus", "benjamin"). Do NOT leave `<name>` as a literal string — the skip-self check on line 5 will fail and create a useless self-loop symlink.
+
 ```bash
 WORKSPACE="$(pwd)"
+CURRENT_USER="<name>"   # ← REPLACE with actual username from Step 4
 mkdir -p shared-context/inbound
 
-# For each configured repo, symlink collaborator outbound folders
+# For each configured repo, symlink OTHER collaborators' outbound folders
+# SKIP the current user's own outbound (they have the originals)
 for REPO_PATH in ../ai-collab ../shared-context ../iu-shared; do
   [ -d "$REPO_PATH" ] || continue
   REPO_NAME=$(basename "$REPO_PATH")
 
   for person_dir in "$REPO_PATH"/*/; do
     person=$(basename "$person_dir")
-    [ "$person" = "<name>" ] && continue  # skip self
+    [ "$person" = "$CURRENT_USER" ] && continue  # skip self — no self-loop
+    [ "$person" = "shared" ] || [ "$person" = "tools" ] && continue  # skip non-person dirs
     [ -f "$person_dir/profile.md" ] || [ -d "$person_dir/outbound" ] || continue
 
     # iu-public (team-wide context)
@@ -405,8 +410,8 @@ for REPO_PATH in ../ai-collab ../shared-context ../iu-shared; do
       ln -sf "$person_dir/outbound/iu-public" "shared-context/inbound/${person}-iu"
 
     # Person-specific (private shares for this user)
-    [ -d "$person_dir/outbound/<name>" ] && \
-      ln -sf "$person_dir/outbound/<name>" "shared-context/inbound/${person}-private"
+    [ -d "$person_dir/outbound/$CURRENT_USER" ] && \
+      ln -sf "$person_dir/outbound/$CURRENT_USER" "shared-context/inbound/${person}-private"
   done
 
   # Shared folder (joint decisions, projects)
@@ -417,9 +422,9 @@ done
 # Inbox symlinks — one per repo that has an inbox for this user
 mkdir -p inbox
 for REPO_PATH in ../ai-collab ../shared-context ../iu-shared; do
-  [ -d "$REPO_PATH/<name>/inbox" ] || continue
+  [ -d "$REPO_PATH/$CURRENT_USER/inbox" ] || continue
   REPO_NAME=$(basename "$REPO_PATH")
-  ln -sf "$REPO_PATH/<name>/inbox" "inbox/$REPO_NAME"
+  ln -sf "$REPO_PATH/$CURRENT_USER/inbox" "inbox/$REPO_NAME"
 done
 ```
 
