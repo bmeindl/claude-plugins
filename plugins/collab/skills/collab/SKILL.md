@@ -136,6 +136,11 @@ outbound/all/       → plaintext
 
 ## Prerequisites
 
+**Dependencies (lazy install):** Before running ANY `collab-sync` command, check deps are available. If missing, install on the spot — this avoids SessionStart timeout issues:
+```bash
+python3 -c "import yaml, pyrage, httpx" 2>/dev/null || pip3 install --user pyyaml pyrage httpx
+```
+
 **Shared repo:** The ai-collab repo must be cloned locally. The setup flow handles this.
 
 **Detect ai-collab location:**
@@ -256,12 +261,28 @@ Check if the user can send AND receive encrypted shares:
    - If exists → "Your SSH key is RSA. You CAN encrypt for others, but you CAN'T receive encrypted files."
    - Offer: "I'll generate an ed25519 key alongside your RSA key. This won't affect your existing setup."
    - On confirm: `ssh-keygen -t ed25519 -f ~/.ssh/id_ed25519 -N ""`
-   - Then offer to upload: `gh ssh-key add ~/.ssh/id_ed25519.pub --title "collab-encryption"` (if gh CLI available)
+   - Then upload (see key upload step below)
 
 3. **No SSH key at all:**
    - "No SSH key found. I'll generate one for encrypted collaboration."
    - `ssh-keygen -t ed25519 -f ~/.ssh/id_ed25519 -N ""`
-   - Offer GitHub upload via `gh ssh-key add`
+   - Then upload (see key upload step below)
+
+4. **Key upload (CRITICAL — do not skip silently):**
+   - Try: `gh ssh-key add ~/.ssh/id_ed25519.pub --title "collab-encryption"`
+   - **If `gh` is not installed or upload fails**, show this LOUD warning:
+     ```
+     ⚠️  YOUR PUBLIC KEY IS NOT UPLOADED YET.
+
+     Others CANNOT send you encrypted files until your ed25519 key
+     is on GitHub (or GitLab).
+
+     Upload manually at: https://github.com/settings/ssh/new
+     Key to copy: <contents of ~/.ssh/id_ed25519.pub>
+
+     Without this, any file encrypted for you will be unreadable.
+     ```
+   - Do NOT silently continue. The user must see and acknowledge this.
 
 This is not blocking — plaintext collaboration still works. But flag it for encrypted file support.
 
