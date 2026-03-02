@@ -692,6 +692,17 @@ When sharing with specific people (e.g., "share with Quintus and Lasse"):
 6. **Check outbound staleness:** `collab-sync check` → offer re-publish if stale
 7. **Check uncommitted changes** in each repo
 
+### Inbound Context Lookup (for the main agent, not sync)
+
+When the main agent needs to check if collaborators have shared something relevant to a topic, it should NOT load all inbound folders into context (doesn't scale with many collaborators). Instead:
+
+1. Spawn a **cheap sub-agent** (Haiku) to scan `shared-context/inbound/`
+2. Sub-agent reads folder listings, READMEs, and filenames across all `inbound/*` symlinks
+3. Sub-agent returns only: relevant file paths + one-line summaries
+4. Main agent reads only the files that matter
+
+This keeps main context small even with 30+ collaborators sharing files.
+
 ---
 
 ## Mode: Inbox
