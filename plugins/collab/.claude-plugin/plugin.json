@@ -1,0 +1,12 @@
+{
+  "name": "collab",
+  "version": "1.0.0",
+  "description": "Shared context collaboration — share knowledge, encrypt for privacy, send messages, sync with collaborators. Works with any git-hosted shared repo (GitHub, GitLab, self-hosted).",
+  "author": {
+    "name": "Benjamin Meindl"
+  },
+  "repository": "https://github.com/bmeindl/claude-plugins",
+  "keywords": ["collaboration", "encryption", "context-sharing", "age", "p2p"],
+  "hooks": "./hooks/hooks.json",
+  "skills": "./skills/"
+}

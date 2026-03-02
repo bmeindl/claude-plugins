@@ -1,0 +1,26 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "bmeindl-plugins",
+  "version": "1.0.0",
+  "owner": {
+    "name": "Benjamin Meindl",
+    "email": "ben@meindl.dev"
+  },
+  "metadata": {
+    "description": "AI-native collaboration tools — share context, encrypt for privacy, communicate through your AI assistant.",
+    "pluginRoot": "./plugins"
+  },
+  "plugins": [
+    {
+      "name": "collab",
+      "description": "Shared context collaboration — share knowledge, encrypt for privacy, send messages, sync with collaborators. Intent-based: say 'share this with Quintus' and the agent handles encryption, routing, and git.",
+      "version": "1.0.0",
+      "author": {
+        "name": "Benjamin Meindl"
+      },
+      "source": "./plugins/collab",
+      "category": "productivity",
+      "keywords": ["collaboration", "encryption", "context-sharing", "p2p", "knowledge-management"]
+    }
+  ]
+}

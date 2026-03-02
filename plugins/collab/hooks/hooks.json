@@ -1,0 +1,10 @@
+{
+  "hooks": [
+    {
+      "event": "SessionStart",
+      "type": "command",
+      "command": "${CLAUDE_PLUGIN_ROOT}/scripts/check-deps.sh",
+      "timeout": 5000
+    }
+  ]
+}
