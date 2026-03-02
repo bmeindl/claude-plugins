@@ -7,48 +7,61 @@ allowed-tools: Read, Write, Edit, Glob, Grep, Bash
 
 # Collab — Shared Context Collaboration
 
-## Architecture: Two Repos, One Workflow
+## Architecture: Plugin + Data Repos
 
-**This plugin provides the SKILL (agent instructions). The DATA lives in a separate shared repo.**
+**This plugin provides the SKILL (agent instructions). The DATA lives in separate shared repos.**
 
 ```
-┌─────────────────────────────┐    ┌──────────────────────────────────┐
-│  claude-plugins (this repo) │    │  ai-collab (shared data repo)    │
-│  ─────────────────────────  │    │  ──────────────────────────────  │
-│  • SKILL.md (agent brain)   │    │  • tools/collab-sync/ (CLI)      │
-│  • hooks (dep check)        │    │  • benjamin/outbound/ (shares)   │
-│  • scripts                  │    │  • benjamin/inbox/ (messages)    │
-│  ─────────────────────────  │    │  • quintus/outbound/ (shares)    │
-│  PUBLIC — anyone can install│    │  • quintus/inbox/ (messages)     │
-│  Contains: zero user data   │    │  • shared/ (joint decisions)     │
-└─────────────────────────────┘    │  ──────────────────────────────  │
-                                   │  PRIVATE — collaborators only    │
-                                   │  Contains: all shared files      │
-                                   │  Encrypted .age files per-person │
-                                   └──────────────────────────────────┘
+┌─────────────────────────────┐
+│  claude-plugins (this repo) │    DATA REPOS (one or more)
+│  ─────────────────────────  │    ─────────────────────────
+│  • SKILL.md (agent brain)   │    ┌────────────────────────────────┐
+│  • hooks (dep check)        │    │  ai-collab (GitHub)            │
+│  • scripts                  │    │  • tools/collab-sync/ (CLI)    │
+│  ─────────────────────────  │    │  • person/outbound/ (shares)   │
+│  PUBLIC — anyone can install│    │  • person/inbox/ (messages)    │
+│  Contains: zero user data   │    │  • shared/ (joint decisions)   │
+└─────────────────────────────┘    └────────────────────────────────┘
+                                   ┌────────────────────────────────┐
+                                   │  shared-context (GitHub)       │
+                                   │  • Private pair sharing        │
+                                   │  • E.g. Benjamin ↔ Quintus    │
+                                   └────────────────────────────────┘
+                                   ┌────────────────────────────────┐
+                                   │  iu-shared (GitLab)            │
+                                   │  • IU team-wide iu-public      │
+                                   │  • IU colleague private shares │
+                                   └────────────────────────────────┘
 
 ┌──────────────────────────────────┐
 │  Your workspace (local only)     │
 │  ──────────────────────────────  │
 │  • CLAUDE.md                     │
 │  • .collab-manifest.yml          │
+│  •   repos: ai-collab, ...      │
 │  • .collab-keys/ (peer pubkeys)  │
 │  • shared-context/inbound/       │
-│    (symlinks → ai-collab)        │
+│    (symlinks → all repos)        │
 │  • inbox/ai-collab/              │
-│    (symlink → ai-collab)         │
+│  • inbox/shared-context/         │
+│  • inbox/iu-shared/              │
 │  ──────────────────────────────  │
 │  YOUR machine only               │
 │  Never pushed anywhere           │
 └──────────────────────────────────┘
 ```
 
-**When Quintus installs this plugin and runs `/collab setup`:**
-- The plugin tells his Claude agent HOW to collaborate
-- Setup clones ai-collab to his machine (the shared data repo)
-- His encrypted files live in `ai-collab/quintus/outbound/`
-- His received files appear in `shared-context/inbound/` via symlinks
-- His local workspace (notes, docs, projects) stays 100% local
+**Not everyone needs all repos.** Typical configurations:
+- **Product team** (Benjamin, Quintus): `ai-collab` + `shared-context`
+- **IU team member** (Lasse, Natalie): `iu-shared` + `ai-collab` (for the tool)
+- **IU team + private pair**: all three
+
+**When a new person installs this plugin and runs `/collab setup`:**
+- The plugin tells their Claude agent HOW to collaborate
+- Setup detects + clones the repos they should have access to
+- Their encrypted files live in `<repo>/<name>/outbound/`
+- Their received files appear in `shared-context/inbound/` via symlinks
+- Their local workspace (notes, docs, projects) stays 100% local
 
 **Encryption flow:**
 - Benjamin shares with Quintus → encrypted with Quintus' public key → `ai-collab/benjamin/outbound/quintus/file.md.age`
@@ -202,28 +215,28 @@ First, let me check your environment."
 
 #### 2. Detect Environment + Auto-Clone
 
+The collab system may use multiple repos. Detect and clone all that apply:
+
 ```bash
-# Find ai-collab repo
-AI_COLLAB=""
-for path in ../ai-collab ../../ai-collab ~/Documents/ai-collab; do
-  if [ -f "$path/CLAUDE.md" ]; then
-    AI_COLLAB="$(cd "$path" && pwd)"
-    break
+# Check for repos as siblings to workspace
+for repo in ai-collab shared-context iu-shared; do
+  if [ -d "../$repo/.git" ]; then
+    echo "Found $repo at ../$repo"
+  else
+    echo "$repo not found locally"
   fi
 done
 ```
 
-**If not found — offer to clone:**
-```
-"I can't find the shared repo (ai-collab). I'll clone it for you.
-
-Where is it hosted?
-1. GitHub (e.g., github.com/org/ai-collab)
-2. GitLab (e.g., gitlab.com/org/ai-collab)
-3. Other git URL"
+**For each missing repo:** Ask if the user should have access. Check their profile in any already-found repo (look for collaborator tables in CLAUDE.md). Offer to clone:
+```bash
+git clone <url> ../<repo-name>
 ```
 
-Then: `git clone <url> ../ai-collab`
+**Typical configurations:**
+- Benjamin + Quintus (product): `ai-collab` + `shared-context`
+- IU team member: `iu-shared` (GitLab) + optionally `ai-collab` (GitHub)
+- IU team + private collab: all three
 
 #### 2.5. Install CLI Tools
 
@@ -305,68 +318,105 @@ Check if the user can send AND receive encrypted shares:
 
 This is not blocking — plaintext collaboration still works. But flag it for encrypted file support.
 
-#### 6. Create Profile (if new)
+#### 6. Create Profile + Folder Scaffold (if new)
 
-Create `ai-collab/<name>/profile.md` using `templates/profile.md` as guide.
-Fill with answers from the interview.
+Create profiles and folder structure in **each repo the user has access to**. Different repos serve different purposes:
 
-Also create folder structure:
+| Repo | Who gets a profile | Purpose |
+|------|--------------------|---------|
+| `ai-collab` | Product collaborators (Benjamin, Quintus) | Tool dev, private sharing |
+| `shared-context` | Private pairs (Benjamin ↔ Quintus) | Person-to-person context |
+| `iu-shared` | All IU team members | Team-wide iu-public sharing |
+
+**For each detected repo**, create the user's folder scaffold:
 ```bash
-mkdir -p ai-collab/<name>/outbound/iu-public
-mkdir -p ai-collab/<name>/outbound/all
-mkdir -p ai-collab/<name>/inbox/from-general
+REPO="../<repo-name>"
+mkdir -p $REPO/<name>/outbound/iu-public
+mkdir -p $REPO/<name>/outbound/all
+mkdir -p $REPO/<name>/inbox/from-general
 # Create outbound/README.md and inbox/README.md
 ```
 
-Create per-person inbox folders for each existing collaborator:
+**Profile** — create in the user's primary repo (ai-collab for product team, iu-shared for IU-only members). Use `templates/profile.md` as guide if available. Fill with interview answers + GitHub/GitLab usernames.
+
+**Cross-create** inbox/outbound folders for existing collaborators in the same repo:
 ```bash
-# For each existing person, create from-<name> in their inbox
-mkdir -p ai-collab/<existing>/inbox/from-<new-name>
-# And create outbound/<existing> for person-specific sharing
-mkdir -p ai-collab/<name>/outbound/<existing>
+# For each existing person in REPO
+for existing in $(ls $REPO/*/profile.md 2>/dev/null | xargs -I{} dirname {} | xargs -I{} basename {}); do
+  [ "$existing" = "<name>" ] && continue
+  mkdir -p $REPO/$existing/inbox/from-<name>
+  mkdir -p $REPO/<name>/outbound/$existing
+  mkdir -p $REPO/<name>/inbox/from-$existing
+done
 ```
 
 #### 7. Initialize Manifest
 
+Create a manifest with all detected repos:
 ```bash
 python3 $AI_COLLAB/tools/collab-sync/sync.py init \
   --name "$(basename $WORKSPACE)" \
   --user "<name>" \
-  --ai-collab "<relative-path-to-ai-collab>"
+  --ai-collab "<relative-path-to-ai-collab>" \
+  --repo shared-context "<relative-path-to-shared-context>" \
+  --repo iu-shared "<relative-path-to-iu-shared>"
+```
+
+Only include `--repo` flags for repos that exist locally. The `--ai-collab` flag is always included (tool lives there). Example for an IU-only member with no private collab:
+```bash
+python3 $AI_COLLAB/tools/collab-sync/sync.py init \
+  --name "my-workspace" --user "lasse" \
+  --ai-collab "../ai-collab" \
+  --repo iu-shared "../iu-shared"
 ```
 
 #### 8. Set Up Symlinks
 
-Determine the workspace structure:
+Create inbound symlinks from **all repos** so the user sees everything in one place:
 
-**For any workspace:**
 ```bash
 WORKSPACE="$(pwd)"
-
-# Create inbound directory
 mkdir -p shared-context/inbound
 
-# For each collaborator, symlink their outbound folders
-# iu-public (team-wide) + person-specific (for this user)
-for person in $(ls $AI_COLLAB/*/profile.md 2>/dev/null | xargs -I{} dirname {} | xargs -I{} basename {}); do
-  [ "$person" = "<name>" ] && continue  # skip self
-  [ -d "$AI_COLLAB/$person/outbound/iu-public" ] && \
-    ln -sf "$AI_COLLAB/$person/outbound/iu-public" "shared-context/inbound/${person}-iu"
-  [ -d "$AI_COLLAB/$person/outbound/<name>" ] && \
-    ln -sf "$AI_COLLAB/$person/outbound/<name>" "shared-context/inbound/${person}-private"
-done
-[ -d "$AI_COLLAB/shared" ] && \
-  ln -sf "$AI_COLLAB/shared" "shared-context/inbound/shared"
+# For each configured repo, symlink collaborator outbound folders
+for REPO_PATH in ../ai-collab ../shared-context ../iu-shared; do
+  [ -d "$REPO_PATH" ] || continue
+  REPO_NAME=$(basename "$REPO_PATH")
 
-# Inbox symlink
+  for person_dir in "$REPO_PATH"/*/; do
+    person=$(basename "$person_dir")
+    [ "$person" = "<name>" ] && continue  # skip self
+    [ -f "$person_dir/profile.md" ] || [ -d "$person_dir/outbound" ] || continue
+
+    # iu-public (team-wide context)
+    [ -d "$person_dir/outbound/iu-public" ] && \
+      ln -sf "$person_dir/outbound/iu-public" "shared-context/inbound/${person}-iu"
+
+    # Person-specific (private shares for this user)
+    [ -d "$person_dir/outbound/<name>" ] && \
+      ln -sf "$person_dir/outbound/<name>" "shared-context/inbound/${person}-private"
+  done
+
+  # Shared folder (joint decisions, projects)
+  [ -d "$REPO_PATH/shared" ] && \
+    ln -sf "$REPO_PATH/shared" "shared-context/inbound/${REPO_NAME}-shared"
+done
+
+# Inbox symlinks — one per repo that has an inbox for this user
 mkdir -p inbox
-ln -sf "$AI_COLLAB/<name>/inbox" inbox/ai-collab
+for REPO_PATH in ../ai-collab ../shared-context ../iu-shared; do
+  [ -d "$REPO_PATH/<name>/inbox" ] || continue
+  REPO_NAME=$(basename "$REPO_PATH")
+  ln -sf "$REPO_PATH/<name>/inbox" "inbox/$REPO_NAME"
+done
 ```
 
 **Add to .gitignore:**
 ```
 shared-context/
 inbox/ai-collab/
+inbox/shared-context/
+inbox/iu-shared/
 .collab-keys/
 ```
 
@@ -384,11 +434,19 @@ Add a "Shared Context" section adapted to the actual symlink paths and collabora
 
 #### 11. Commit + Push Setup
 
+Commit + push in each repo that was modified during setup:
 ```bash
-cd $AI_COLLAB
-git add <name>/
-git commit -m "setup: <name> joined collaboration"
-git push
+for REPO_PATH in ../ai-collab ../shared-context ../iu-shared; do
+  [ -d "$REPO_PATH/.git" ] || continue
+  cd "$REPO_PATH"
+  # Only commit if there are staged/new files
+  if [ -n "$(git status --porcelain)" ]; then
+    git add <name>/
+    git commit -m "setup: <name> joined collaboration"
+    git push
+  fi
+  cd -
+done
 ```
 
 #### 12. Done
@@ -396,12 +454,12 @@ git push
 ```
 "Collaboration is set up!
 
-Your space:       ai-collab/<name>/
-Profile:          ai-collab/<name>/profile.md
+Repos configured: [list of repos in manifest]
+Profile:          [repo]/<name>/profile.md
 Encryption:       [ed25519 ✓ / needs key — see above]
 Connected peers:  [list]
 Inbound context:  shared-context/inbound/
-Inbox:            inbox/ai-collab/
+Inbox:            inbox/[repo-names]/
 
 Try these:
 - '/collab status' — see what's shared
@@ -440,14 +498,20 @@ Try these:
    # Agent looks up project ID and user ID, then invites
    ```
 
-5. **Create folder scaffold** in the appropriate repo:
+5. **Create folder scaffold** in the appropriate repo(s):
+   - IU colleague → create in `iu-shared` (and `ai-collab` if they'll use the tool)
+   - Private collaborator → create in `shared-context` (or relevant private repo)
+   - Product team → create in `ai-collab`
    ```bash
-   mkdir -p REPO/<name>/outbound/iu-public
-   mkdir -p REPO/<name>/outbound/all
-   mkdir -p REPO/<name>/inbox/from-general
-   # Cross-create inbox folders for existing collaborators
-   for existing in $(ls REPO/*/profile.md | xargs dirname | xargs basename); do
-     mkdir -p REPO/$existing/inbox/from-<name>
+   for REPO in <relevant-repos>; do
+     mkdir -p $REPO/<name>/outbound/iu-public
+     mkdir -p $REPO/<name>/outbound/all
+     mkdir -p $REPO/<name>/inbox/from-general
+     # Cross-create inbox folders for existing collaborators in same repo
+     for existing in $(ls $REPO/*/profile.md 2>/dev/null | xargs -I{} dirname {} | xargs -I{} basename {}); do
+       [ "$existing" = "<name>" ] && continue
+       mkdir -p $REPO/$existing/inbox/from-<name>
+     done
    done
    ```
 
@@ -471,8 +535,10 @@ Try these:
 
 8. **Update collaborators table** in repo CLAUDE.md
 
-9. **Commit + push:**
+9. **Commit + push** each modified repo:
    ```bash
+   # For each repo that was modified
+   cd $REPO
    git add <name>/ CLAUDE.md
    git commit -m "setup: <name> joined collaboration"
    git push
@@ -481,10 +547,15 @@ Try these:
 10. **Report:**
     ```
     "Added <name> as collaborator.
+
+    Repos: [list of repos they were added to]
+    Encryption: [connected / iu-public only]
+
     They should:
-    1. Install the collab plugin
+    1. Install the collab plugin (from claude-plugins)
     2. Run /collab setup in their workspace
-    3. They'll automatically see all iu-public shared context."
+    3. They'll automatically see all iu-public shared context.
+    4. For private sharing, they need an ed25519 SSH key."
     ```
 
 ---
@@ -601,13 +672,13 @@ When sharing with specific people (e.g., "share with Quintus and Lasse"):
 
 ### Flow
 
-1. **Find ai-collab repo** (from manifest or detect)
-2. **Pull latest:** `git pull --rebase` in ai-collab
-3. **Decrypt inbound:** `collab-sync pull --dry` → if files found → `collab-sync pull`
-4. **Report changes** (new files, decrypted files, messages)
-5. **Symlinks auto-update** (point to ai-collab)
+1. **Read manifest** to discover all configured repos
+2. **Pull latest** from each repo: `git pull --rebase` in each configured repo path. Warn on failure, continue with others.
+3. **Decrypt inbound:** `collab-sync pull --dry` → if files found → `collab-sync pull` (scans all repos automatically)
+4. **Report changes** (new files, decrypted files, messages — grouped by repo)
+5. **Symlinks auto-update** (point to repo folders)
 6. **Check outbound staleness:** `collab-sync check` → offer re-publish if stale
-7. **Check uncommitted changes** in ai-collab
+7. **Check uncommitted changes** in each repo
 
 ---
 
@@ -615,7 +686,9 @@ When sharing with specific people (e.g., "share with Quintus and Lasse"):
 
 **Trigger:** `inbox`, "check messages"
 
-Scan `ai-collab/<user>/inbox/from-*/`, read YAML frontmatter, present sorted by date. Enrich with local context.
+Scan inbox folders across all configured repos. If symlinks are set up, scan `inbox/*/from-*/` (each subfolder is a repo). Otherwise, read manifest and scan `<repo>/<user>/inbox/from-*/` for each repo.
+
+Read YAML frontmatter, present sorted by date, grouped by sender. Enrich with local context.
 
 ---
 
@@ -623,7 +696,14 @@ Scan `ai-collab/<user>/inbox/from-*/`, read YAML frontmatter, present sorted by 
 
 **Trigger:** `send <person> <message>`
 
-Compose message with YAML frontmatter (from, date, intent, urgency, tags). Confirm before sending. Write to `ai-collab/<recipient>/inbox/from-<sender>/`. Commit + push.
+Compose message with YAML frontmatter (from, date, intent, urgency, tags). Confirm before sending.
+
+**Repo routing for messages:**
+- Determine which repo the recipient lives in by checking which repos have a `<recipient>/inbox/` folder
+- If recipient exists in multiple repos, prefer: `shared-context` (private pair) > `iu-shared` (IU team) > `ai-collab` (fallback)
+- Write to `<repo>/<recipient>/inbox/from-<sender>/YYYY-MM-DD_<slug>.md`
+
+Commit + push to the target repo.
 
 ---
 
