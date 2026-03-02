@@ -688,18 +688,33 @@ When sharing with specific people (e.g., "share with Quintus and Lasse"):
 2. **Pull latest** from each repo: `git pull --rebase` in each configured repo path. Warn on failure, continue with others.
 3. **Decrypt inbound:** `collab-sync pull --dry` → if files found → `collab-sync pull` (scans all repos automatically)
 4. **Report changes** (new files, decrypted files, messages — grouped by repo)
-5. **Symlinks auto-update** (point to repo folders)
-6. **Check outbound staleness:** `collab-sync check` → offer re-publish if stale
-7. **Check uncommitted changes** in each repo
+5. **Update inbound registry** (`.collab-inbound-map.yml` at workspace root, gitignored)
+
+   Scan all files in `shared-context/inbound/*/` (through symlinks). Compare against existing registry entries. For each NEW file not yet in the registry:
+   - Read the file (or first 20 lines + any `<!-- tag: ... -->` line)
+   - Generate a one-line summary
+   - Add entry to the YAML:
+     ```yaml
+     - source: shared-context/inbound/quintus-private/reorg-notes.md
+       from: quintus
+       first_seen: 2026-03-02T10:00:00Z
+       summary: "Department reorg proposal — PM and engineering restructure"
+     ```
+   - Create the file if it doesn't exist yet (with `version: 1` header)
+   - Skip `.gitkeep` files
+
+   This is registry only — no sorting or mapping to context areas. Just a record of what arrived, from whom, with a summary. The registry enables quick lookups later (see Inbound Context Lookup below).
+
+6. **Symlinks auto-update** (point to repo folders)
+7. **Check outbound staleness:** `collab-sync check` → offer re-publish if stale
+8. **Check uncommitted changes** in each repo
 
 ### Inbound Context Lookup (for the main agent, not sync)
 
 When the main agent needs to check if collaborators have shared something relevant to a topic, it should NOT load all inbound folders into context (doesn't scale with many collaborators). Instead:
 
-1. Spawn a **cheap sub-agent** (Haiku) to scan `shared-context/inbound/`
-2. Sub-agent reads folder listings, READMEs, and filenames across all `inbound/*` symlinks
-3. Sub-agent returns only: relevant file paths + one-line summaries
-4. Main agent reads only the files that matter
+1. **Quick check:** Read `.collab-inbound-map.yml` and filter entries by `summary` keywords. One small file covers all inbound content. If matches found → read those files directly.
+2. **Deep scan (fallback):** If the registry doesn't exist yet or the topic doesn't match any summary, spawn a **cheap sub-agent** (Haiku) to scan `shared-context/inbound/` directly. Sub-agent reads folder listings and filenames, returns only relevant paths + summaries.
 
 This keeps main context small even with 30+ collaborators sharing files.
 
