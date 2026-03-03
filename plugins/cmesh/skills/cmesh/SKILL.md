@@ -14,10 +14,10 @@ One skill for all collaboration:
 - **Share** — Publish local context to the shared space with visibility controls
 - **Sync** — Pull latest + check for stale local shares via manifest
 - **Inbox** — Check messages from collaborators
-- **Send** — Write a message to a collaborator's inbox
-- **Ask** — Search all shared context (inbound + shared)
+- **Send** — Write a message to a collaborator
+- **Ask** — Search all shared context (inbound from collaborators)
 - **Read** — Read a specific collaborator's shared context
-- **Decide** — Log a decision in the shared decision log
+- **Decide** — Log a decision record
 - **Status** — Overview of shared context, inbox count, sync state, manifest health
 - **Brief** — Generate a briefing from a collaborator's shared context
 
@@ -37,12 +37,19 @@ shares:
     status: active                        # active | source_missing | paused
     targets:
       - repo: ai-collab                  # target repo name
-        dest: benjamin/outbound/iu-public/file.md  # path in target
-        visibility: iu-public             # iu-public | <person> | all
+        dest: benjamin/quintus/file.md    # path in target (<sender>/<recipient>/)
+        visibility: quintus               # <person> (ai-collab is always bilateral)
         last_synced: 2026-03-01T14:00:00Z
         source_checksum: <sha256>         # for stale detection
         tag: "~150 char description"
-        encrypt_for: ""                   # empty = plaintext, person name = age-encrypted
+        encrypt_for: quintus              # person name = age-encrypted (always for ai-collab)
+      - repo: syntea-shared-context       # IU GitLab repo for team knowledge
+        dest: context/file.md             # path in target
+        visibility: iu-public             # team-wide sharing
+        last_synced: 2026-03-01T14:00:00Z
+        source_checksum: <sha256>
+        tag: "~150 char description"
+        encrypt_for: ""                   # team shares are plaintext
 ```
 
 **Deterministic sync tool:** `tools/collab-sync/sync.py` handles all file operations (found via `$COLLAB_TOOL` discovery — see Mode: Setup):
@@ -58,12 +65,11 @@ collab-sync pull [--dry]       # Decrypt inbound .age files
 collab-sync list [--peer <name>] [--json]  # Show connected peers + shared files
 ```
 
-**Encryption model:** Person-specific shares (`outbound/<person>/`) are automatically age-encrypted. Team-wide (`outbound/iu-public/`) and public (`outbound/all/`) shares stay plaintext. The agent decides visibility; `collab-sync` handles encryption transparently.
+**Encryption model:** All ai-collab shares are bilateral (person-to-person) and automatically age-encrypted. Team-wide knowledge goes to `syntea.shared.context` on IU GitLab (plaintext). The agent decides routing; `collab-sync` handles encryption transparently.
 
 ```
-outbound/<person>/  → auto-encrypted (requires connect first)
-outbound/iu-public/ → plaintext
-outbound/all/       → plaintext
+ai-collab/<sender>/<person>/  → auto-encrypted (requires connect first)
+syntea-shared-context/        → plaintext (IU team knowledge)
 ```
 
 **Division of labor:**
@@ -102,7 +108,7 @@ If not found, ask the user for the path.
 **On invocation, check state before asking what to do:**
 
 ```
-1. Are symlinks configured? (check for shared-context/ or inbox/ai-collab/)
+1. Are symlinks configured? (check for shared-context/inbound/)
    - No → Suggest setup
    - Yes → Existing user → Show menu
 
@@ -233,43 +239,34 @@ Fill with answers from the interview.
 
 Also create folder structure:
 ```bash
-mkdir -p ai-collab/<name>/outbound/iu-public
-mkdir -p ai-collab/<name>/outbound/all
-mkdir -p ai-collab/<name>/inbox/from-general
-# Create outbound/README.md and inbox/README.md
-```
-
-Create per-person inbox folders for each existing collaborator:
-```bash
-# For each existing person, create from-<name> in their inbox
-mkdir -p ai-collab/<existing>/inbox/from-<new-name>
-# And create outbound/<existing> for person-specific sharing
-mkdir -p ai-collab/<name>/outbound/<existing>
+# Create a subfolder for each existing collaborator
+for collab in $(ls -d ai-collab/*/profile.md 2>/dev/null | xargs -I{} dirname {} | xargs -n1 basename); do
+  mkdir -p "ai-collab/<name>/$collab"
+done
+# Also create reverse: existing collaborators get a subfolder for the new person
+for collab in $(ls -d ai-collab/*/profile.md 2>/dev/null | xargs -I{} dirname {} | xargs -n1 basename); do
+  mkdir -p "ai-collab/$collab/<name>"
+done
 ```
 
 #### 6. Set Up Symlinks
 
 Determine the workspace structure. The skill needs to know:
 - Where PM/work context lives (for inbound shared context)
-- Where the inbox lives (for messages)
 
 **For a ground-control-style workspace:**
 ```bash
 WORKSPACE="$(pwd)"  # e.g., /Users/name/Documents/ground-control
 
-# INBOUND: Symlink collaborators' shared context into local workspace
-# Determine the right local location (e.g., syntea-pm/shared-context/)
+# INBOUND: One symlink per collaborator pointing to their folder for you
 mkdir -p syntea-pm/shared-context/inbound
 
-# For each collaborator, symlink their relevant outbound folders
-# Example: Quintus → link iu-public + benjamin-specific
-ln -s "$AI_COLLAB/quintus/outbound/iu-public" syntea-pm/shared-context/inbound/quintus-iu
-ln -s "$AI_COLLAB/quintus/outbound/benjamin" syntea-pm/shared-context/inbound/quintus-private
-ln -s "$AI_COLLAB/shared" syntea-pm/shared-context/inbound/shared
-
-# INBOX: Symlink personal inbox
-ln -s "$AI_COLLAB/benjamin/inbox" inbox/ai-collab
+# For each collaborator, symlink their folder addressed to you
+# Example: Quintus → link quintus/benjamin (what Quintus shares with you)
+ln -s "$AI_COLLAB/quintus/benjamin" syntea-pm/shared-context/inbound/quintus-private
 ```
+
+No inbox symlink needed — `/cmesh inbox` scans `ai-collab/*/<you>/` directly.
 
 **For a minimal/new workspace:**
 ```bash
@@ -281,7 +278,6 @@ mkdir -p shared-context/inbound
 ```
 # Shared context (symlinks to ai-collab)
 syntea-pm/shared-context/
-inbox/ai-collab/
 # Or for minimal workspace:
 shared-context/
 ```
@@ -297,18 +293,14 @@ Shared context from collaborators appears as local folders via symlinks.
 No special handling needed — just read them like any other context.
 
 **Inbound (PM workspace):** `syntea-pm/shared-context/inbound/` contains:
-- `quintus-iu/` — Quintus' IU-public context
 - `quintus-private/` — Quintus' context shared specifically with Benjamin
-- `shared/` — jointly maintained context (projects, decisions)
 
-**Inbox:** `inbox/ai-collab/` — messages from collaborators
-
-**On startup for PM work:** Skim inbound README files for recently shared context.
+**On startup for PM work:** Skim inbound folders for recently shared context.
 
 **Commands:**
 - `/cmesh sync` — Pull latest from ai-collab (symlinks auto-update)
 - `/cmesh share` — Publish local context to the shared space
-- `/cmesh inbox` — Check messages from collaborators
+- `/cmesh inbox` — Check messages from collaborators (scans ai-collab/*/<you>/)
 - `/cmesh send <person> <msg>` — Send a message
 - `/cmesh status` — Overview of collaboration state
 ```
@@ -322,7 +314,6 @@ Adapt the section to match the actual symlink paths and collaborators.
 
 - Profile created at ai-collab/<name>/profile.md
 - Symlinks: shared context from [collaborators] appears locally
-- Inbox: messages at inbox/ai-collab/
 - CLAUDE.md updated with shared context routing
 
 Try these:
@@ -342,7 +333,7 @@ Try these:
 
 **ALWAYS confirm before sharing.** Never auto-publish. Show:
 1. What will be shared (file or content summary)
-2. Where it will go (which outbound folder)
+2. Where it will go (which target repo and folder)
 3. Who will see it (visibility)
 
 ### Flow
@@ -352,29 +343,32 @@ Try these:
    - If user describes content → find it in the workspace (search context/, inbox/, etc.)
    - If ambiguous → ask: "Which file or content do you want to share?"
 
-2. **Determine visibility**
-   - If user says "with Quintus" → `outbound/quintus/`
-   - If user says "for IU" or "for the team" → `outbound/iu-public/`
-   - If user says "for everyone" or "public" → `outbound/all/`
-   - If not specified → ask: "Who should see this?"
+2. **Determine routing**
 
-   Visibility options:
+   Two targets exist — route based on audience:
+   - If user says "with Quintus" → ai-collab: `<sender>/quintus/`
+   - If user says "with [person]" → ai-collab: `<sender>/<person>/`
+   - If user says "for IU" or "for the team" → syntea.shared.context on IU GitLab (via manifest)
+   - If not specified → ask: "Who should see this? A specific person, or the whole team?"
+
+   Routing options:
    ```
-   - [person name] — only that person (encrypted)
-   - [person1, person2] — those specific people (encrypted copy in each person's folder)
-   - iu-public — anyone at IU (all repo collaborators, plaintext)
-   - everyone — completely public (plaintext)
+   - [person name]         → ai-collab/<sender>/<person>/ (encrypted)
+   - [person1, person2]    → ai-collab/<sender>/<person>/ for each (encrypted copy)
+   - iu/team               → syntea.shared.context on IU GitLab (plaintext, via manifest)
    ```
 
-   **Encryption (automatic for person-specific shares):**
-   When visibility is a person name (not `iu-public`, not `all`):
+   **ai-collab is always bilateral.** No "public" or "all" visibility in ai-collab — everything there is between specific people. Team-wide knowledge goes to the IU GitLab repo only.
+
+   **Encryption (automatic for ai-collab shares):**
+   All ai-collab shares are person-specific and auto-encrypted:
    1. Check if `.collab-keys/{person}.pub` exists in the workspace
    2. **If missing:** Ask: "To encrypt for {person}, I need their SSH public keys. What's their GitHub (or GitLab) username?" → run `collab-sync connect {person} --github {username}`
    3. **If found:** Proceed automatically — encryption is transparent
    4. Add `--encrypt-for {person}` to the `collab-sync add` command
    5. The tool auto-appends `.age` to the dest path and handles encryption
 
-   The user never types `--encrypt-for`. They say "share this with Quintus" → you detect person-specific visibility → check for keys → encrypt automatically.
+   The user never types `--encrypt-for`. They say "share this with Quintus" → you detect person-specific routing → check for keys → encrypt automatically.
 
 3. **Generate tag** (auto-generated from content if not provided)
    - Read the content, produce a ~150 char description
@@ -382,9 +376,18 @@ Try these:
 
 4. **Confirm**
    ```
-   "I'll share this to ai-collab/<user>/outbound/<visibility>/<filename>.md
+   "I'll share this to ai-collab/<sender>/<recipient>/<filename>.md
    Visible to: [who]
-   Encryption: [encrypted for <person> / plaintext]
+   Encryption: [encrypted for <person>]
+   Tag: [generated tag]
+
+   Confirm? [Yes/No]"
+   ```
+
+   For team shares (IU GitLab):
+   ```
+   "I'll share this to syntea.shared.context (IU GitLab)
+   Visible to: IU team
    Tag: [generated tag]
 
    Confirm? [Yes/No]"
@@ -402,52 +405,48 @@ Try these:
    [content from the original file]
    ```
 
-6. **Update outbound/README.md**
-   - Add entry under the correct visibility section
-   - Include filename + tag
-
-7. **Update manifest + commit + push**
+6. **Update manifest + commit + push**
 
    If `.collab-manifest.yml` exists in the workspace:
    ```bash
    # Add to manifest (computes checksum, records entry)
-   # For person-specific (encrypted):
+   # For person-specific (ai-collab, encrypted):
    python3 $COLLAB_TOOL/tools/collab-sync/sync.py \
      --workspace $WORKSPACE \
      add "$SOURCE_REL" \
-     --dest "<user>/outbound/<person>/<filename>.md" \
-     --visibility "<person>" \
-     --encrypt-for "<person>" \
+     --dest "<sender>/<recipient>/<filename>.md" \
+     --visibility "<recipient>" \
+     --encrypt-for "<recipient>" \
      --tag "<the tag>"
 
-   # For team/public (plaintext):
+   # For team knowledge (IU GitLab, plaintext):
    python3 $COLLAB_TOOL/tools/collab-sync/sync.py \
      --workspace $WORKSPACE \
      add "$SOURCE_REL" \
-     --dest "<user>/outbound/<visibility>/<filename>.md" \
-     --visibility "<visibility>" \
+     --dest "context/<filename>.md" \
+     --visibility "iu-public" \
      --tag "<the tag>"
    ```
 
    Then commit and push ai-collab:
    ```bash
    cd $AI_COLLAB
-   git add <user>/outbound/
-   git commit -m "share: <filename> (<visibility>) — <user>"
+   git add <sender>/<recipient>/
+   git commit -m "share: <filename> → <recipient> — <sender>"
    git push
    ```
 
    If no manifest exists, skip the `collab-sync add` step (still works without manifest).
 
-8. **Optionally annotate local file**
+7. **Optionally annotate local file**
    Offer: "Want me to add a note to the original file that it's shared?"
    If yes, add a comment at the top: `<!-- shared -->`
 
-### Multi-Person Visibility
+### Multi-Person Sharing
 
 When sharing with specific people (e.g., "share with Quintus and Lasse"):
-- Copy the file to `outbound/quintus/` AND `outbound/lasse/`
-- Both get indexed in outbound/README.md
+- Copy the file to `<sender>/quintus/` AND `<sender>/lasse/`
+- Each copy is independently encrypted for its recipient
 
 ---
 
@@ -480,9 +479,9 @@ When sharing with specific people (e.g., "share with Quintus and Lasse"):
 4. **Report inbound changes**
    ```
    "Pulled shared context updates:
-   - 2 new files from Quintus in outbound/iu-public/
+   - 2 new files from Quintus in quintus/<you>/
    - 1 encrypted file decrypted from Quintus
-   - 1 message in your inbox from Quintus
+   - 1 new message from Quintus
    (or: Already up to date.)"
    ```
 
@@ -493,7 +492,7 @@ When sharing with specific people (e.g., "share with Quintus and Lasse"):
 
 5. **Symlinks auto-update** — no further action needed, since symlinks point to the ai-collab directory.
 
-6. **Check outbound staleness (if manifest exists)**
+6. **Check staleness of your shares (if manifest exists)**
 
    If `.collab-manifest.yml` exists in the workspace:
    ```bash
@@ -525,18 +524,22 @@ When sharing with specific people (e.g., "share with Quintus and Lasse"):
 
 ### Flow
 
-1. **Scan inbox folder** via symlinks or directly in ai-collab:
+1. **Scan all collaborator folders for files addressed to this user:**
    ```bash
-   # Via symlink
-   ls inbox/ai-collab/from-*/
-   # Or directly
-   ls $AI_COLLAB/<user>/inbox/from-*/
+   # Scan ai-collab/*/<user>/ across all collaborators
+   for sender_dir in $AI_COLLAB/*/; do
+     sender=$(basename "$sender_dir")
+     [ "$sender" = "<user>" ] && continue  # skip own folder
+     inbox_path="$sender_dir/<user>"
+     [ -d "$inbox_path" ] && ls "$inbox_path"/*.md 2>/dev/null
+   done
    ```
 
-2. **For each message file:**
-   - Read YAML frontmatter (from, date, intent, urgency, tags)
+2. **For each message file** (files with message frontmatter):
+   - Read HTML comment frontmatter (from, date, intent, urgency, tags)
    - Read the tag line for summary
    - Read full content
+   - Distinguish messages (have intent/urgency frontmatter) from shared documents (in concepts/ subfolder or no message frontmatter)
 
 3. **Present messages sorted by date (newest first):**
    ```
@@ -605,14 +608,12 @@ Enrich with relevant context — don't dump raw files.
    Message content...
    ```
 
-   Place in: `ai-collab/<recipient>/inbox/from-<sender>/YYYY-MM-DD_<slug>.md`
+   Place in: `ai-collab/<sender>/<recipient>/YYYY-MM-DD_<slug>.md`
 
-5. **Update recipient's inbox/README.md** with the new message
-
-6. **Commit and push:**
+5. **Commit and push:**
    ```bash
    cd $AI_COLLAB
-   git add <recipient>/inbox/
+   git add <sender>/<recipient>/
    git commit -m "msg: <sender> → <recipient> — <subject-slug>"
    git push
    ```
@@ -625,9 +626,8 @@ Enrich with relevant context — don't dump raw files.
 
 ### Search Priority
 
-1. **Shared context** — `shared/` (via symlink or direct)
-2. **Inbound context from collaborators** — `shared-context/inbound/` (via symlinks)
-3. **Collaborator profiles** — `<person>/profile.md`
+1. **Inbound context from collaborators** — `shared-context/inbound/` (via symlinks) or `ai-collab/*/<user>/`
+2. **Collaborator profiles** — `ai-collab/<person>/profile.md`
 
 ### Flow
 
@@ -647,18 +647,18 @@ Enrich with relevant context — don't dump raw files.
 
 1. **Identify the person**
 2. **Find their shared content:**
-   - Check symlinked inbound: `shared-context/inbound/<person>-iu/`, `shared-context/inbound/<person>-private/`
-   - Or directly: `ai-collab/<person>/outbound/` (filter to folders this user should see)
-3. **Read their outbound/README.md** for the index with tags
+   - Check symlinked inbound: `shared-context/inbound/<person>-private/`
+   - Or directly: `ai-collab/<person>/<user>/` (what they shared with you)
+3. **List files in their folder** — look for concepts/ subfolder and top-level messages
 4. **Present overview:**
    ```
-   "Quintus has shared:
+   "Quintus has shared with you:
 
-   IU Public:
-   - pm-observations.md — Beobachtungen aus 6 Monaten als PM Lead.
+   Documents:
+   - concepts/architecture-feedback.md — Feedback zum AI Workspace Architektur-Entwurf.
 
-   For you (private):
-   - architecture-feedback.md — Feedback zum AI Workspace Architektur-Entwurf.
+   Messages:
+   - 2026-03-01_mvp-scope.md — Vorschlag zum MVP-Scope.
 
    Profile updated: 2026-02-28
    Current focus: AI Workspace product, SynteaOS leadership"
@@ -679,12 +679,12 @@ Enrich with relevant context — don't dump raw files.
    - Date, participants, status
    - Context, options considered, decision, consequences
 3. **Show draft for confirmation**
-4. **Write to `ai-collab/shared/decisions/YYYY-MM-DD_<topic>.md`**
-5. **Update `shared/README.md`** decisions table
-6. **Commit and push:**
+4. **Write to `claude-plugins/decisions/YYYY-MM-DD_<topic>.md`** (decisions about the collaboration tool go here)
+   - Or to a local workspace decisions folder if the decision is workspace-specific
+5. **Commit and push:**
    ```bash
-   cd $AI_COLLAB
-   git add shared/
+   cd $COLLAB_TOOL/../..  # claude-plugins root
+   git add decisions/
    git commit -m "decision: <topic>"
    git push
    ```
@@ -712,26 +712,20 @@ Collab Status
 Setup:          [OK / Needs setup — run /cmesh setup]
 ai-collab repo: [path] — [up to date / N commits behind / uncommitted changes]
 
-Inbound Context:
-  - benjamin-iu:     N files (own IU-public shares)
-  - quintus-iu:      N files (last updated: YYYY-MM-DD)
-  - quintus-private:  N files
-  - shared:           N files
-
-Outbound (your shares):
-  - iu-public:  N files
-  - quintus:    N files
-  - all:        N files
+Per Collaborator:
+  - quintus:
+    - shared with you:  N files (in quintus/<you>/)
+    - you shared:       N files (in <you>/quintus/)
+    - symlink:          [OK / broken / missing]
 
 Encryption:
   Your identity:  [ssh-ed25519 ✓ / RSA only (can't receive) / no key found]
   Connected:      [peer list with key count + fingerprint]
-  Encrypted:      N outbound shares
-  Plaintext:      N outbound shares
+  Encrypted:      N shares
   Pending:        N inbound .age files
 
 Manifest:       [N shares tracked / N stale / N source missing / not found]
-Inbox:          N messages (N unread)
+Inbox:          N messages (N unread) — scanned from */<you>/
 Profile:        [OK / outdated — last updated YYYY-MM-DD]
 
 Suggestions:
@@ -757,7 +751,7 @@ python3 $COLLAB_TOOL/tools/collab-sync/sync.py --workspace $WORKSPACE list --jso
 ### Flow
 
 1. **Read the person's profile** (`ai-collab/<person>/profile.md`)
-2. **Read their shared outbound content** (all folders this user can see)
+2. **Read their shared content addressed to you** (`ai-collab/<person>/<user>/`)
 3. **Synthesize a briefing:**
    ```
    "Quintus Stierstorfer — Briefing
@@ -770,7 +764,7 @@ python3 $COLLAB_TOOL/tools/collab-sync/sync.py --workspace $WORKSPACE list --jso
 
    Key themes: [cross-cutting themes from their shared context]
 
-   Recent messages: [summary of recent inbox messages from them]"
+   Recent messages: [summary of recent messages from them]"
    ```
 
 4. This is read-only — no writes, no confirmation needed.
@@ -787,25 +781,23 @@ python3 $COLLAB_TOOL/tools/collab-sync/sync.py --workspace $WORKSPACE list --jso
 
 ### Index Updates (Write-Time)
 
-**Every write to ai-collab updates the relevant README.md in the same action:**
+**Writer-owns-folder model:** Each person writes only to their own top-level folder (`ai-collab/<sender>/`). No cross-writing to other people's folders.
 
-| Write target | Update this index |
-|-------------|-------------------|
-| `<user>/outbound/<visibility>/` | `<user>/outbound/README.md` |
-| `<user>/inbox/from-<sender>/` | `<user>/inbox/README.md` |
-| `shared/projects/` | `shared/README.md` |
-| `shared/decisions/` | `shared/README.md` |
+| Write target | Notes |
+|-------------|-------|
+| `<sender>/<recipient>/` | Messages and shared documents for that recipient |
+| `<sender>/profile.md` | Own profile updates |
 
 ### Git Safety
 
 - **Always pull before push** — avoid conflicts
 - **Never force-push** — this is a shared repo
-- **Commit messages follow pattern:** `share:`, `msg:`, `decision:`, `profile:`, `setup:`
+- **Commit messages follow pattern:** `share:`, `msg:`, `decision:`, `profile:`, `setup:`, `sync:`
 - **One operation = one commit** — don't batch unrelated changes
 
 ### Symlink Awareness
 
-The skill should be aware that local paths like `syntea-pm/shared-context/inbound/quintus-iu/` are symlinks to `ai-collab/quintus/outbound/iu-public/`. When reading, use the local path (feels natural). When writing, work directly in ai-collab (need git operations).
+The skill should be aware that local paths like `syntea-pm/shared-context/inbound/quintus-private/` are symlinks to `ai-collab/quintus/<user>/`. When reading, use the local path (feels natural). When writing, work directly in ai-collab (need git operations). There is one symlink per collaborator.
 
 ---
 
@@ -819,4 +811,4 @@ The skill should be aware that local paths like `syntea-pm/shared-context/inboun
 | `ai-collab/CLAUDE.md` | How any agent should use the shared repo |
 | `tools/collab-sync/` | Deterministic sync tool (Python CLI) — found via `$COLLAB_TOOL` |
 | `migration-from-department-context.md` | Guide for colleagues migrating from department-context |
-| `shared/decisions/2026-03-01_source-of-truth-architecture.md` | Architecture decision: local source + manifest |
+| `decisions/` | Decision records (in claude-plugins repo) |
