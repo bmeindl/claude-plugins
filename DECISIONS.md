@@ -41,7 +41,7 @@ Tracks architectural decisions, alternatives considered, and reasoning. Product 
 
 ## 2026-03-02: Dependency Management — Hook + Setup Combo
 
-**Decision:** Use a SessionStart hook to WARN about missing deps, and auto-install during `/collab setup`.
+**Decision:** Use a SessionStart hook to WARN about missing deps, and auto-install during `/cmesh setup`.
 
 **Why not auto-install in hook?** Hooks run every session start. Installing packages silently on every start is invasive. The hook just warns; setup handles installation once.
 

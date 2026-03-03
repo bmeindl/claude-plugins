@@ -1,4 +1,4 @@
-# Claude Plugins — AI-Native Collaboration
+# Claude Plugins — Agent Context Mesh
 
 A Claude Code plugin marketplace for AI-native knowledge sharing and encrypted collaboration.
 
@@ -8,11 +8,11 @@ A Claude Code plugin marketplace for AI-native knowledge sharing and encrypted c
 # 1. Add this marketplace
 /plugin marketplace add bmeindl/claude-plugins
 
-# 2. Install the collab plugin
-/plugin install collab@bmeindl-plugins
+# 2. Install the cmesh plugin
+/plugin install cmesh@bmeindl-plugins
 
 # 3. Run the interactive setup (~5 minutes)
-/collab setup
+/cmesh setup
 ```
 
 > **Note:** If step 1 fails with "SSH authentication failed", run this first to use HTTPS:
@@ -24,16 +24,16 @@ That's it. Setup handles everything: cloning the shared repo, generating SSH key
 
 ## Available Plugins
 
-### collab
+### cmesh (Agent Context Mesh)
 
-**Shared context collaboration** — share knowledge with your team, encrypted for privacy. Your AI assistant handles encryption, git operations, and routing automatically.
+**Agent Context Mesh** — share knowledge with your team, encrypted for privacy. Your AI assistant handles encryption, git operations, and routing automatically.
 
 ```
-/collab share strategy-notes.md with Quintus    → encrypted, only Quintus can read
-/collab share coding-standards.md for the team  → plaintext, visible to all collaborators
-/collab inbox                                    → check messages from collaborators
-/collab sync                                     → pull latest + decrypt inbound files
-/collab status                                   → overview of everything
+/cmesh share strategy-notes.md with Quintus    → encrypted, only Quintus can read
+/cmesh share coding-standards.md for the team  → plaintext, visible to all collaborators
+/cmesh inbox                                    → check messages from collaborators
+/cmesh sync                                     → pull latest + decrypt inbound files
+/cmesh status                                   → overview of everything
 ```
 
 **10 modes:** setup, share, sync, inbox, send, ask, read, decide, status, brief, contacts
@@ -54,7 +54,6 @@ Plugin code:                    Shared data:                       Your files:
 • SKILL.md (agent brain)        • <user>/outbound/ (shares)        • CLAUDE.md
 • hooks (dep check)             • <user>/inbox/ (messages)         • .collab-manifest.yml
 • scripts                       • shared/ (decisions)              • .collab-keys/ (pubkeys)
-                                • tools/collab-sync/ (CLI)         • shared-context/inbound/
 Zero user data.                 Encrypted .age files.                (symlinks → ai-collab)
 Anyone can install.             Collaborators only.                Never leaves your machine.
 ```
@@ -78,9 +77,9 @@ Python dependencies (auto-installed during setup):
 If someone invited you to collaborate, here's what happens:
 
 1. You run the 3 commands above
-2. `/collab setup` asks your name, role, what you're working on
+2. `/cmesh setup` asks your name, role, what you're working on
 3. It clones the shared repo, creates your profile, generates encryption keys
-4. You're done — say `/collab inbox` to check for messages
+4. You're done — say `/cmesh inbox` to check for messages
 
 **You don't need to understand encryption, git, or SSH.** The AI handles all of it.
 

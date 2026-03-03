@@ -306,11 +306,11 @@ No special handling needed — just read them like any other context.
 **On startup for PM work:** Skim inbound README files for recently shared context.
 
 **Commands:**
-- `/cmeshsync` — Pull latest from ai-collab (symlinks auto-update)
-- `/cmeshshare` — Publish local context to the shared space
-- `/cmeshinbox` — Check messages from collaborators
-- `/cmeshsend <person> <msg>` — Send a message
-- `/cmeshstatus` — Overview of collaboration state
+- `/cmesh sync` — Pull latest from ai-collab (symlinks auto-update)
+- `/cmesh share` — Publish local context to the shared space
+- `/cmesh inbox` — Check messages from collaborators
+- `/cmesh send <person> <msg>` — Send a message
+- `/cmesh status` — Overview of collaboration state
 ```
 
 Adapt the section to match the actual symlink paths and collaborators.
@@ -326,10 +326,10 @@ Adapt the section to match the actual symlink paths and collaborators.
 - CLAUDE.md updated with shared context routing
 
 Try these:
-- '/cmeshstatus' — see what's shared
-- '/cmeshshare <topic>' — share something
-- '/cmeshinbox' — check for messages
-- '/cmeshsync' — pull latest context"
+- '/cmesh status' — see what's shared
+- '/cmesh share <topic>' — share something
+- '/cmesh inbox' — check for messages
+- '/cmesh sync' — pull latest context"
 ```
 
 ---
@@ -635,7 +635,7 @@ Enrich with relevant context — don't dump raw files.
 2. Search shared and inbound context (Glob + Grep via symlinks)
 3. Read relevant files
 4. Summarize findings, cite source files and who shared them
-5. If nothing found: "No shared context on that topic. You could ask [person] via `/cmeshsend`."
+5. If nothing found: "No shared context on that topic. You could ask [person] via `/cmesh send`."
 
 ---
 

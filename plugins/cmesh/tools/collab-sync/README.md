@@ -16,7 +16,7 @@ The core insight: **privacy and file operations should never depend on LLM judgm
 # Check what's stale or missing (read-only, safe to run anytime)
 python3 sync.py --workspace /path/to/workspace check
 
-# Short summary (for /collab status)
+# Short summary (for /cmesh status)
 python3 sync.py --workspace /path/to/workspace check --summary
 
 # JSON output (for programmatic use)
@@ -69,7 +69,7 @@ User says "share this"
         │
         ▼
 ┌─────────────────┐
-│  /collab share   │  LLM agent: decides visibility, generates tag,
+│  /cmesh share   │  LLM agent: decides visibility, generates tag,
 │  (SKILL.md)      │  confirms with user
 └────────┬────────┘
          │
