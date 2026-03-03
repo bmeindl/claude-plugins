@@ -1,7 +1,7 @@
 {
-  "name": "collab",
+  "name": "cmesh",
   "version": "1.0.0",
-  "description": "Shared context collaboration — share knowledge, encrypt for privacy, send messages, sync with collaborators. Works with any git-hosted shared repo (GitHub, GitLab, self-hosted).",
+  "description": "Agent Context Mesh — share knowledge, encrypt for privacy, send messages, sync with collaborators. Works with any git-hosted shared repo (GitHub, GitLab, self-hosted).",
   "author": {
     "name": "Benjamin Meindl"
   },

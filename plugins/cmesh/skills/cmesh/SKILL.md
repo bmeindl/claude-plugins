@@ -1,11 +1,11 @@
 ---
-name: collab
-description: Shared context collaboration — share knowledge, send messages, sync with collaborators. Use when user says "share this", "send to [person]", "check inbox", "sync collab", "what has [person] shared", "collab setup", or any intent to share context, communicate with collaborators, or manage the shared space.
+name: cmesh
+description: Agent Context Mesh — share knowledge, send messages, sync with collaborators. Use when user says "share this", "send to [person]", "check inbox", "sync cmesh", "what has [person] shared", "cmesh setup", or any intent to share context, communicate with collaborators, or manage the shared space.
 argument-hint: "setup | share <topic> | sync | inbox | send <person> <msg> | ask <question> | read <person> | decide <topic> | status | brief <person>"
 allowed-tools: Read, Write, Edit, Glob, Grep, Bash
 ---
 
-# Collab — Shared Context Collaboration
+# Agent Context Mesh — Shared Context Collaboration
 
 ## What This Skill Does
 
@@ -45,7 +45,7 @@ shares:
         encrypt_for: ""                   # empty = plaintext, person name = age-encrypted
 ```
 
-**Deterministic sync tool:** `collab-tool/tools/collab-sync/sync.py` handles all file operations (found via `$COLLAB_TOOL` discovery — see Mode: Setup):
+**Deterministic sync tool:** `tools/collab-sync/sync.py` handles all file operations (found via `$COLLAB_TOOL` discovery — see Mode: Setup):
 ```bash
 collab-sync check              # Report stale/missing shares (read-only)
 collab-sync check --summary    # Short summary for status display
@@ -169,14 +169,14 @@ If not found: "I can't find the ai-collab data repo. Please clone it as a siblin
 `git clone https://github.com/<org>/ai-collab.git` (next to your workspace folder, NOT inside it)."
 
 ```bash
-# Find collab-tool (sync CLI)
-# Priority: dev sibling → workspace mount → plugin bundle → plugin cache
+# Find cmesh tool (sync CLI)
+# Priority: claude-plugins sibling → workspace mount → plugin-relative → plugin cache
 COLLAB_TOOL=""
-for path in ../collab-tool \
-            "$WORKSPACE/personal/projects/collab-tool" \
+for path in ../claude-plugins/plugins/cmesh \
+            "$WORKSPACE/personal/projects/claude-plugins/plugins/cmesh" \
             "$(dirname "$SKILL_PATH")/../.." \
-            ~/.claude/plugins/*/collab \
-            ~/.claude/plugins/cache/collab; do
+            ~/.claude/plugins/*/cmesh \
+            ~/.claude/plugins/cache/cmesh; do
   if [ -d "$path/tools/collab-sync" ]; then
     COLLAB_TOOL="$(cd "$path" && pwd)"
     break
@@ -185,11 +185,11 @@ done
 ```
 
 If not found, offer to clone it:
-"I can't find collab-sync. Let me clone the tool repo as a sibling to your workspace."
+"I can't find collab-sync. Let me clone the plugins repo as a sibling to your workspace."
 ```bash
 cd "$(dirname "$WORKSPACE")"
-git clone https://github.com/bmeindl/collab-tool.git
-COLLAB_TOOL="$(cd ../collab-tool && pwd)"
+git clone https://github.com/bmeindl/claude-plugins.git
+COLLAB_TOOL="$(cd ../claude-plugins/plugins/cmesh && pwd)"
 ```
 
 #### 3. Identify User
@@ -306,11 +306,11 @@ No special handling needed — just read them like any other context.
 **On startup for PM work:** Skim inbound README files for recently shared context.
 
 **Commands:**
-- `/collab sync` — Pull latest from ai-collab (symlinks auto-update)
-- `/collab share` — Publish local context to the shared space
-- `/collab inbox` — Check messages from collaborators
-- `/collab send <person> <msg>` — Send a message
-- `/collab status` — Overview of collaboration state
+- `/cmeshsync` — Pull latest from ai-collab (symlinks auto-update)
+- `/cmeshshare` — Publish local context to the shared space
+- `/cmeshinbox` — Check messages from collaborators
+- `/cmeshsend <person> <msg>` — Send a message
+- `/cmeshstatus` — Overview of collaboration state
 ```
 
 Adapt the section to match the actual symlink paths and collaborators.
@@ -326,10 +326,10 @@ Adapt the section to match the actual symlink paths and collaborators.
 - CLAUDE.md updated with shared context routing
 
 Try these:
-- '/collab status' — see what's shared
-- '/collab share <topic>' — share something
-- '/collab inbox' — check for messages
-- '/collab sync' — pull latest context"
+- '/cmeshstatus' — see what's shared
+- '/cmeshshare <topic>' — share something
+- '/cmeshinbox' — check for messages
+- '/cmeshsync' — pull latest context"
 ```
 
 ---
@@ -635,7 +635,7 @@ Enrich with relevant context — don't dump raw files.
 2. Search shared and inbound context (Glob + Grep via symlinks)
 3. Read relevant files
 4. Summarize findings, cite source files and who shared them
-5. If nothing found: "No shared context on that topic. You could ask [person] via `/collab send`."
+5. If nothing found: "No shared context on that topic. You could ask [person] via `/cmeshsend`."
 
 ---
 
@@ -709,7 +709,7 @@ Enrich with relevant context — don't dump raw files.
 ```
 Collab Status
 ─────────────
-Setup:          [OK / Needs setup — run /collab setup]
+Setup:          [OK / Needs setup — run /cmesh setup]
 ai-collab repo: [path] — [up to date / N commits behind / uncommitted changes]
 
 Inbound Context:
@@ -817,6 +817,6 @@ The skill should be aware that local paths like `syntea-pm/shared-context/inboun
 | `templates/project.md` | Shared project template |
 | `templates/decision.md` | Decision record template |
 | `ai-collab/CLAUDE.md` | How any agent should use the shared repo |
-| `collab-tool/tools/collab-sync/` | Deterministic sync tool (Python CLI) — found via `$COLLAB_TOOL` |
+| `tools/collab-sync/` | Deterministic sync tool (Python CLI) — found via `$COLLAB_TOOL` |
 | `migration-from-department-context.md` | Guide for colleagues migrating from department-context |
 | `shared/decisions/2026-03-01_source-of-truth-architecture.md` | Architecture decision: local source + manifest |

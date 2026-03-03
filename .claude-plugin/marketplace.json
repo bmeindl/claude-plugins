@@ -12,13 +12,13 @@
   },
   "plugins": [
     {
-      "name": "collab",
-      "description": "Shared context collaboration — share knowledge, encrypt for privacy, send messages, sync with collaborators. Intent-based: say 'share this with Quintus' and the agent handles encryption, routing, and git.",
+      "name": "cmesh",
+      "description": "Agent Context Mesh — share knowledge, encrypt for privacy, send messages, sync with collaborators. Intent-based: say 'share this with Quintus' and the agent handles encryption, routing, and git.",
       "version": "1.0.0",
       "author": {
         "name": "Benjamin Meindl"
       },
-      "source": "./plugins/collab",
+      "source": "./plugins/cmesh",
       "category": "productivity",
       "keywords": ["collaboration", "encryption", "context-sharing", "p2p", "knowledge-management"]
     }
