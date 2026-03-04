@@ -43,8 +43,8 @@ shares:
         source_checksum: <sha256>         # for stale detection
         tag: "~150 char description"
         encrypt_for: quintus              # person name = age-encrypted (always for ai-collab)
-      - repo: syntea-shared-context       # IU GitLab repo for team knowledge
-        dest: context/file.md             # path in target
+      - repo: syntea-shared-context       # IU GitLab team knowledge (nested clone at ai-collab/team/)
+        dest: lasting/file.md             # path in target (lasting/ or operational/)
         visibility: iu-public             # team-wide sharing
         last_synced: 2026-03-01T14:00:00Z
         source_checksum: <sha256>
@@ -65,11 +65,11 @@ collab-sync pull [--dry]       # Decrypt inbound .age files
 collab-sync list [--peer <name>] [--json]  # Show connected peers + shared files
 ```
 
-**Encryption model:** All ai-collab shares are bilateral (person-to-person) and automatically age-encrypted. Team-wide knowledge goes to `syntea.shared.context` on IU GitLab (plaintext). The agent decides routing; `collab-sync` handles encryption transparently.
+**Encryption model:** All bilateral shares are person-to-person and automatically age-encrypted. Team-wide knowledge goes to `ai-collab/team/` (a nested IU GitLab clone, plaintext). The agent decides routing; `collab-sync` handles encryption transparently.
 
 ```
 ai-collab/<sender>/<person>/  → auto-encrypted (requires connect first)
-syntea-shared-context/        → plaintext (IU team knowledge)
+ai-collab/team/               → plaintext (IU team knowledge, nested GitLab clone)
 ```
 
 **Division of labor:**
@@ -91,6 +91,8 @@ syntea-shared-context/        → plaintext (IU team knowledge)
 ## Prerequisites
 
 **Shared repo:** `ai-collab/` must be cloned as a sibling to your workspace (e.g., `~/Documents/ai-collab/`).
+
+**Team knowledge (optional):** If the user shares IU team knowledge, `ai-collab/team/` should contain a clone of `syntea.shared.context` from IU GitLab. This is a nested clone (separate `.git`, gitignored by parent). Setup handles this automatically.
 
 **Detect ai-collab location:**
 ```bash
@@ -268,6 +270,8 @@ ln -s "$AI_COLLAB/quintus/benjamin" syntea-pm/shared-context/inbound/quintus-pri
 
 No inbox symlink needed — `/cmesh inbox` scans `ai-collab/*/<you>/` directly.
 
+**Important: inbound files are read-only.** Never move, rename, or delete files in a collaborator's folder. Those are their copies, published from their workspace. The author controls their lifecycle.
+
 **For a minimal/new workspace:**
 ```bash
 mkdir -p shared-context/inbound
@@ -348,17 +352,17 @@ Try these:
    Two targets exist — route based on audience:
    - If user says "with Quintus" → ai-collab: `<sender>/quintus/`
    - If user says "with [person]" → ai-collab: `<sender>/<person>/`
-   - If user says "for IU" or "for the team" → syntea.shared.context on IU GitLab (via manifest)
+   - If user says "for IU" or "for the team" → `ai-collab/team/` (nested IU GitLab clone, via manifest)
    - If not specified → ask: "Who should see this? A specific person, or the whole team?"
 
    Routing options:
    ```
    - [person name]         → ai-collab/<sender>/<person>/ (encrypted)
    - [person1, person2]    → ai-collab/<sender>/<person>/ for each (encrypted copy)
-   - iu/team               → syntea.shared.context on IU GitLab (plaintext, via manifest)
+   - iu/team               → ai-collab/team/ (plaintext, nested IU GitLab clone)
    ```
 
-   **ai-collab is always bilateral.** No "public" or "all" visibility in ai-collab — everything there is between specific people. Team-wide knowledge goes to the IU GitLab repo only.
+   **Bilateral shares are always person-specific.** No "public" or "all" visibility in the bilateral folders — everything there is between specific people. Team-wide knowledge goes to `ai-collab/team/` (which is a separate IU GitLab repo, nested inside ai-collab and gitignored by the parent).
 
    **Encryption (automatic for ai-collab shares):**
    All ai-collab shares are person-specific and auto-encrypted:
@@ -384,9 +388,9 @@ Try these:
    Confirm? [Yes/No]"
    ```
 
-   For team shares (IU GitLab):
+   For team shares (IU GitLab via ai-collab/team/):
    ```
-   "I'll share this to syntea.shared.context (IU GitLab)
+   "I'll share this to ai-collab/team/ (IU GitLab)
    Visible to: IU team
    Tag: [generated tag]
 
@@ -419,20 +423,27 @@ Try these:
      --encrypt-for "<recipient>" \
      --tag "<the tag>"
 
-   # For team knowledge (IU GitLab, plaintext):
+   # For team knowledge (ai-collab/team/, plaintext, pushed to IU GitLab):
    python3 $COLLAB_TOOL/tools/collab-sync/sync.py \
      --workspace $WORKSPACE \
      add "$SOURCE_REL" \
-     --dest "context/<filename>.md" \
+     --dest "lasting/<filename>.md" \
      --visibility "iu-public" \
      --tag "<the tag>"
    ```
 
-   Then commit and push ai-collab:
+   Then commit and push:
    ```bash
+   # For bilateral shares:
    cd $AI_COLLAB
    git add <sender>/<recipient>/
    git commit -m "share: <filename> → <recipient> — <sender>"
+   git push
+
+   # For team shares (separate repo inside ai-collab/team/):
+   cd $AI_COLLAB/team
+   git add .
+   git commit -m "share: <filename> — team knowledge"
    git push
    ```
 
@@ -724,6 +735,7 @@ Encryption:
   Encrypted:      N shares
   Pending:        N inbound .age files
 
+Team Content:   N files in ai-collab/team/ (lasting: N, operational: N)
 Manifest:       [N shares tracked / N stale / N source missing / not found]
 Inbox:          N messages (N unread) — scanned from */<you>/
 Profile:        [OK / outdated — last updated YYYY-MM-DD]

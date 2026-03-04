@@ -48,17 +48,19 @@ That's it. Setup handles everything: cloning the shared repo, generating SSH key
 ## Architecture
 
 ```
-This repo (PUBLIC)              ai-collab repo (PRIVATE)           Your workspace (LOCAL)
-────────────────                ──────────────────────             ────────────────────
-Plugin code:                    Shared data:                       Your files:
-• SKILL.md (agent brain)        • <user>/outbound/ (shares)        • CLAUDE.md
-• hooks (dep check)             • <user>/inbox/ (messages)         • .collab-manifest.yml
-• scripts                       • shared/ (decisions)              • .collab-keys/ (pubkeys)
-Zero user data.                 Encrypted .age files.                (symlinks → ai-collab)
-Anyone can install.             Collaborators only.                Never leaves your machine.
+This repo (PUBLIC)              ai-collab folder (PRIVATE)          Your workspace (LOCAL)
+────────────────                ──────────────────────              ────────────────────
+Plugin code:                    Shared data:                        Your files:
+• SKILL.md (agent brain)        • <user>/<recipient>/ (bilateral)   • CLAUDE.md
+• hooks (dep check)             • team/ (nested IU GitLab clone)    • .collab-manifest.yml
+• decisions/                    Encrypted .age files.               • .collab-keys/ (pubkeys)
+Zero user data.                 Collaborators only.                   (symlinks → ai-collab)
+Anyone can install.                                                Never leaves your machine.
 ```
 
-**The plugin is the brain. The shared repo is the body. Your workspace is yours.**
+**The plugin is the brain. ai-collab is the collaboration folder. Your workspace is yours.**
+
+ai-collab contains ALL shared content: bilateral shares between people (GitHub repo) and team knowledge (nested IU GitLab clone, gitignored by parent). One folder, two repos.
 
 ## Requirements
 
